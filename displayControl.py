@@ -1,0 +1,84 @@
+from collections import deque
+from machine import ADC, Pin
+import constants
+import time
+import utime
+
+class DisplayController:
+
+    currentTemp = 50
+    led_pin = Pin(constants.LedPins.LED_PIN, Pin.OUT)
+    jet_pin = Pin(constants.LedPins.JET_PIN, Pin.OUT)
+    heat_pin = Pin(constants.LedPins.HEAT_PIN, Pin.OUT)
+
+    #jet_button = Pin(constants.PanelButtonPins.JET, Pin.IN, Pin.PULL_DOWN)
+    #jet_last = time.ticks_ms()jet_pin.toggle()
+    light_button = Pin(constants.PanelButtonPins.LIGHT, Pin.IN, Pin.PULL_DOWN)
+    
+    light_last = time.time() * 1000
+    pot = ADC(Pin(27)) # Potentiometer for temperature control, needs pin number
+
+    heat_on = False
+    filter_on = False
+    light_on = False
+    queue: deque #= None
+    
+    def __init__(self):
+        self.jet_pin.on()
+        self.heat_pin.on()
+        self.led_pin.on()
+        self.light_button.irq(trigger=Pin.IRQ_RISING, handler=self.button_handler)
+        
+    def set_deque(self, queue: deque):
+        self.queue = queue
+
+    def set_leds(self, heat_on, jet_on, light_on):
+        if heat_on:
+            self.heat_pin.on() # Active Low
+        else:
+            self.heat_pin.off()
+        if jet_on:
+            self.jet_pin.off() # Active Low
+        else:
+            self.jet_pin.on()
+        if light_on:
+            self.led_pin.off() # Active Low
+        else:
+            self.led_pin.on()
+
+    def set_temperature(self):
+        pot_value = self.pot.read_u16() # read value, 0-65535 across voltage range 0.0v - 3.3v
+        print("Pot Value: ", pot_value)
+        # Map pot_value to a temperature range (e.g., 50°F to 110°F)
+        temp = constants.MIN_TEMPERATURE + (pot_value / 4300)
+        temp = round(temp)
+        print("Mapped Temp: ", temp)
+        if( temp < constants.MIN_TEMPERATURE):
+            temp = constants.MIN_TEMPERATURE
+        elif( temp > constants.MAX_TEMPERATURE):
+            temp = constants.MAX_TEMPERATURE
+
+        if(temp > max(constants.FAIL_SAFE_HOT, self.currentTemp) or temp < min(constants.FAIL_SAFE_COLD, self.currentTemp)):
+            # If the new temp is outside of the fail safe range compared to current temp, ignore it
+            return
+
+        if(temp < self.currentTemp):
+            self.queue.append('SET_TARGET_TEMP')
+        elif(temp > self.currentTemp):
+            self.queue.append('SET_TARGET_TEMP')
+        constants.TARGET_TEMPERATURE = temp
+        self.currentTemp = temp
+
+    def button_handler(self, pin):
+        #global light_last, light_button
+      
+        if pin is self.light_button:
+           now = time.time() * 1000
+           if (now - self.light_last) > 500:
+                self.light_on = True
+                self.led_pin.toggle()
+                self.queue.append('LED_TOGGLE')
+        #elif pin is green_btn:
+        #   if time.ticks_diff(time.ticks_ms(), green_last) > 500:
+        #       green_led.toggle()
+        #       green_last = time.ticks_ms()

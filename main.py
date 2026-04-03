@@ -39,17 +39,19 @@ jet_relay_pin = Pin(constants.RelayPins.JET_RELAY_PIN, Pin.OUT)
 led_relay_pin.on() # Turn off LED (Active Low)
 jet_relay_pin.on() # Turn off Jet (Active Low)
 
+power_led_pin = Pin(constants.LedPins.POWER_PIN, Pin.OUT)
 light_led_pin = Pin(constants.LedPins.LED_PIN, Pin.OUT)
 jet_led_pin = Pin(constants.LedPins.JET_PIN, Pin.OUT)
 heat_led_pin = Pin(constants.LedPins.HEAT_PIN, Pin.OUT)
 
+power_led_pin.on()
 light_led_pin.off() # Active Low
-jet_led_pin.on() # Active Low
+jet_led_pin.off() # Active Low
 
 pot = ADC(Pin(27)) # Potentiometer for temperature control, needs pin number
 
-light_button = Pin(constants.PanelButtonPins.LIGHT, Pin.IN, Pin.PULL_DOWN)
-jet_button = Pin(constants.PanelButtonPins.JET, Pin.IN, Pin.PULL_DOWN)
+light_button = Pin(constants.PanelButtonPins.LIGHT, Pin.IN, Pin.PULL_UP)
+jet_button = Pin(constants.PanelButtonPins.JET, Pin.IN, Pin.PULL_UP)
    
 #tc = TempController()
 ow = OneWire(Pin(constants.TEMP_PIN)) # Need PIN Number
@@ -67,6 +69,7 @@ def button_handler( pin):
     if pin is light_button:
         now = time() * 1000
         if (now - light_last) > 500:
+            #light_button.irq(trigger=Pin.IRQ_RISING, handler=button_handler)
             print("Toggling LED")
             led_relay_pin.toggle()
             light_led_pin.toggle() 
@@ -74,6 +77,7 @@ def button_handler( pin):
     elif pin is jet_button:
         now = time() * 1000
         if (now - light_last) > 500:
+            #jet_button.irq(trigger=Pin.IRQ_RISING, handler=button_handler) 
             print("Toggling Jet")
             jet_relay_pin.toggle()
             jet_led_pin.toggle()
@@ -91,11 +95,11 @@ def set_leds(heat_on, jet_on, light_on):
 
 def get_target_temperature(_currentTemp):
     pot_value = pot.read_u16() # read value, 0-65535 across voltage range 0.0v - 3.3v
-    print("Pot Value: ", pot_value)
+    #print("Pot Value: ", pot_value)
     # Map pot_value to a temperature range (e.g., 50°F to 110°F)
     temp = constants.MIN_TEMPERATURE + (pot_value / 4300)
     temp = round(temp)
-    print("Mapped Temp: ", temp)
+    #print("Mapped Temp: ", temp)
     if( temp < constants.MIN_TEMPERATURE):
         temp = constants.MIN_TEMPERATURE
     elif( temp > constants.MAX_TEMPERATURE):
@@ -116,6 +120,7 @@ def get_target_temperature(_currentTemp):
     return temp 
 
 light_button.irq(trigger=Pin.IRQ_RISING, handler=button_handler) 
+jet_button.irq(trigger=Pin.IRQ_RISING, handler=button_handler) 
 
 while True:
     # Simulating threads by Moding the second count to run tasks when needed like it was on a thread
@@ -191,19 +196,26 @@ while True:
             if action:
                 if action == 'HEATER_ON':
                     heater_on = True
+                    heat_led_pin.on() # Active Low
                 elif action == 'HEATER_OFF':
                     heater_on = False
+                    heat_led_pin.off() # Active Low
                 elif action == 'JETS_ON':
                     jets_on = True
+                    jet_led_pin.on() # Active Low
                 elif action == 'JETS_OFF':
                     jets_on = False
-                elif action == 'TOGGLE_JET':
-                    jets_on = not jets_on
+                    jet_led_pin.off() # Active Low
+               
 
             if (heater_on or jets_on) and not hard_stop:
                 jet_relay_pin.off() # Active Low
+               # jet_led_pin.off()
+               # heat_led_pin.off()
             elif (not heater_on and not jets_on and tempCheckStatus != constants.TempCheckStatus.CIRCULATING) or hard_stop:
                 jet_relay_pin.on() # Active Low
+               # heat_led_pin.on()
+               # jet_led_pin.on()
             
         seconds += 1
         tempCheckCycles += 1

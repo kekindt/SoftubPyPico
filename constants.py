@@ -4,6 +4,7 @@ class LedPins():
     JET_PIN = 18
     HEAT_PIN = 17
     LED_PIN = 16
+    POWER_PIN = 0
 
 class RelayPins():
     LED_RELAY_PIN = 12
@@ -41,6 +42,6 @@ class LcdLine():
     LINE4 = 3
 
 class PanelButtonPins():
-    JET = 30
+    JET = 19
     LIGHT = 6
     
